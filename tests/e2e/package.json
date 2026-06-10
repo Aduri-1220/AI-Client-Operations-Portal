@@ -1,0 +1,27 @@
+{
+  "name": "e2e",
+  "version": "1.0.0",
+  "description": "Playwright end-to-end tests for the AI Client Operations Portal",
+  "scripts": {
+    "test": "playwright test",
+    "test:workflow": "playwright test specs/workflow.spec.ts",
+    "test:auth": "playwright test specs/auth.spec.ts",
+    "test:dashboard": "playwright test specs/dashboard.spec.ts",
+    "test:clients": "playwright test specs/clients.spec.ts",
+    "test:projects": "playwright test specs/projects.spec.ts",
+    "test:tasks": "playwright test specs/tasks.spec.ts",
+    "test:approvals": "playwright test specs/approvals.spec.ts",
+    "test:documents": "playwright test specs/documents.spec.ts",
+    "test:reports": "playwright test specs/reports.spec.ts",
+    "test:ai": "playwright test specs/ai-assistant.spec.ts",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report results"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

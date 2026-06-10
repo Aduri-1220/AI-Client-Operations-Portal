@@ -1,0 +1,71 @@
+{
+  "name": "Client Onboarding Workflow",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook — New Client Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "path": "client-created",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "2",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "parameters": {
+        "toEmail": "={{ $json.email }}",
+        "subject": "Welcome to our Portal — {{ $json.name }}",
+        "text": "Dear {{ $json.contactPerson }},\n\nWelcome to the AI Client Operations Portal. Your account has been created successfully.\n\nYour dedicated project team will be in touch shortly.\n\nBest regards,\nThe Operations Team"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Create Default Project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [700, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/projects",
+        "sendHeaders": true,
+        "headers": { "Authorization": "Bearer {{ $env.API_TOKEN }}" },
+        "sendBody": true,
+        "bodyParameters": {
+          "name": "=Onboarding — {{ $json.name }}",
+          "clientId": "={{ $json.id }}",
+          "status": "PLANNING",
+          "budget": 0,
+          "startDate": "={{ new Date().toISOString().split('T')[0] }}",
+          "deadline": "={{ new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] }}"
+        }
+      }
+    },
+    {
+      "id": "4",
+      "name": "Notify Internal Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [950, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "text": ":tada: New client onboarded: *{{ $json.name }}* ({{ $json.company }}). Project created. Please review and assign team."
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook — New Client Created": { "main": [[{ "node": "Send Welcome Email", "type": "main", "index": 0 }]] },
+    "Send Welcome Email": { "main": [[{ "node": "Create Default Project", "type": "main", "index": 0 }]] },
+    "Create Default Project": { "main": [[{ "node": "Notify Internal Team", "type": "main", "index": 0 }]] }
+  }
+}

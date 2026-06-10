@@ -1,0 +1,57 @@
+{
+  "name": "Daily Overdue Task Reminder",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Schedule Trigger — 9 AM Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Fetch Overdue Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL }}/tasks/overdue",
+        "sendHeaders": true,
+        "headers": { "Authorization": "Bearer {{ $env.API_TOKEN }}" }
+      }
+    },
+    {
+      "id": "3",
+      "name": "IF — Tasks Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $json.length }}", "operation": "larger", "value2": 0 }]
+        }
+      }
+    },
+    {
+      "id": "4",
+      "name": "Send Email to Assignees",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [950, 200],
+      "parameters": {
+        "toEmail": "={{ $env.MANAGER_EMAIL }}",
+        "subject": ":warning: {{ $json.length }} Overdue Tasks — Action Required",
+        "text": "The following tasks are overdue:\n\n={{ $json.map(t => `- ${t.title} (${t.projectId}) — Due: ${t.dueDate}`).join('\\n') }}\n\nPlease review and update."
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger — 9 AM Daily": { "main": [[{ "node": "Fetch Overdue Tasks", "type": "main", "index": 0 }]] },
+    "Fetch Overdue Tasks": { "main": [[{ "node": "IF — Tasks Found", "type": "main", "index": 0 }]] },
+    "IF — Tasks Found": { "main": [[{ "node": "Send Email to Assignees", "type": "main", "index": 0 }], []] }
+  }
+}

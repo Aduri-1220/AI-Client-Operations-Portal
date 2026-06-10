@@ -1,0 +1,52 @@
+{
+  "name": "Document Approval Workflow",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook — Document Uploaded",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {
+        "path": "document-uploaded",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "id": "2",
+      "name": "Create Approval Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/approvals",
+        "sendHeaders": true,
+        "headers": { "Authorization": "Bearer {{ $env.API_TOKEN }}" },
+        "sendBody": true,
+        "bodyParameters": {
+          "title": "={{ $json.documentName }}",
+          "documentId": "={{ $json.documentId }}",
+          "requestedBy": "={{ $json.uploadedBy }}",
+          "status": "PENDING"
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Notify Reviewer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "toEmail": "={{ $env.REVIEWER_EMAIL }}",
+        "subject": "Document awaiting your approval: {{ $json.documentName }}",
+        "text": "A document has been submitted for your review:\n\nDocument: {{ $json.documentName }}\nProject: {{ $json.projectName }}\nSubmitted by: {{ $json.uploadedBy }}\n\nPlease log in to the portal to approve or reject."
+      }
+    }
+  ],
+  "connections": {
+    "Webhook — Document Uploaded": { "main": [[{ "node": "Create Approval Record", "type": "main", "index": 0 }]] },
+    "Create Approval Record": { "main": [[{ "node": "Notify Reviewer", "type": "main", "index": 0 }]] }
+  }
+}

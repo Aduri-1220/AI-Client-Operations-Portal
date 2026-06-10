@@ -1,0 +1,145 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  ACR_NAME: 'aiopsportalacr'
+  RESOURCE_GROUP: 'ai-ops-portal-rg'
+  ACI_API: 'aiops-api-dev'
+  ACI_WEB: 'aiops-web-dev'
+
+stages:
+  - stage: Lint
+    displayName: 'Lint & Type Check'
+    jobs:
+      - job: LintFrontend
+        steps:
+          - task: NodeTool@0
+            inputs: { versionSpec: '20.x' }
+          - script: npm ci && npm run lint
+            workingDirectory: apps/web
+            displayName: 'Lint frontend'
+      - job: LintBackend
+        steps:
+          - task: NodeTool@0
+            inputs: { versionSpec: '20.x' }
+          - script: npm ci && npm run lint
+            workingDirectory: apps/api
+            displayName: 'Lint backend'
+
+  - stage: Test
+    displayName: 'Unit & Integration Tests'
+    dependsOn: Lint
+    jobs:
+      - job: TestBackend
+        steps:
+          - task: NodeTool@0
+            inputs: { versionSpec: '20.x' }
+          - script: npm ci && npm test -- --passWithNoTests --coverage
+            workingDirectory: apps/api
+            displayName: 'Run backend tests'
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'apps/api/test-results/*.xml'
+      - job: TestDotnet
+        steps:
+          - task: UseDotNet@2
+            inputs: { version: '8.x' }
+          - script: dotnet test
+            workingDirectory: apps/dotnet-service/ReportsService
+            displayName: 'Run .NET tests'
+
+  - stage: E2E
+    displayName: 'Playwright E2E Tests'
+    dependsOn: Test
+    jobs:
+      - job: PlaywrightTests
+        steps:
+          - task: NodeTool@0
+            inputs: { versionSpec: '20.x' }
+          - script: npm ci && npx playwright install --with-deps
+            workingDirectory: tests/e2e
+            displayName: 'Install Playwright'
+          - script: npm test
+            workingDirectory: tests/e2e
+            displayName: 'Run E2E tests'
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'tests/e2e/results/*.xml'
+
+  - stage: Build
+    displayName: 'Build Docker Images'
+    dependsOn: E2E
+    jobs:
+      - job: BuildImages
+        steps:
+          - task: Docker@2
+            displayName: 'Login to ACR'
+            inputs:
+              command: login
+              containerRegistry: '$(ACR_SERVICE_CONNECTION)'
+          - task: Docker@2
+            displayName: 'Build & push API'
+            inputs:
+              command: buildAndPush
+              repository: 'api'
+              dockerfile: 'apps/api/Dockerfile'
+              tags: |
+                $(Build.BuildId)
+                latest
+          - task: Docker@2
+            displayName: 'Build & push Web'
+            inputs:
+              command: buildAndPush
+              repository: 'web'
+              dockerfile: 'apps/web/Dockerfile'
+              tags: |
+                $(Build.BuildId)
+                latest
+          - task: Docker@2
+            displayName: 'Build & push .NET Reports'
+            inputs:
+              command: buildAndPush
+              repository: 'reports'
+              dockerfile: 'apps/dotnet-service/ReportsService/Dockerfile'
+              tags: |
+                $(Build.BuildId)
+                latest
+
+  - stage: Deploy
+    displayName: 'Deploy to Azure'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployAzure
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Deploy Bicep infra'
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az deployment group create \
+                        --resource-group $(RESOURCE_GROUP) \
+                        --template-file infra/bicep/main.bicep \
+                        --parameters environment=dev
+                - task: AzureCLI@2
+                  displayName: 'Update ACI containers'
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az container restart --name $(ACI_API) --resource-group $(RESOURCE_GROUP)
+                      az container restart --name $(ACI_WEB) --resource-group $(RESOURCE_GROUP)

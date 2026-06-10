@@ -1,0 +1,28 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Test results
+coverage/
+test-results/
+playwright-report/
+tests/e2e/results/
+
+# Azure
+.azure/
+
+# OS
+.DS_Store
+Thumbs.db
