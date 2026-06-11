@@ -5,7 +5,7 @@ param environment string = 'dev'
 param location string = resourceGroup().location
 
 @description('Container registry name')
-param acrName string = 'aiopsportalacr${environment}'
+param acrName string = 'aiopsportalacr'
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
   name: acrName
@@ -24,8 +24,10 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
   }
 }
 
+var storageAccountName = 'aiops${uniqueString(resourceGroup().id)}'
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: 'aiops${environment}storage'
+  name: storageAccountName
   location: location
   sku: { name: 'Standard_LRS' }
   kind: 'StorageV2'
