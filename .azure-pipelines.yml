@@ -62,16 +62,21 @@ stages:
         steps:
           - task: NodeTool@0
             inputs: { versionSpec: '20.x' }
+          - script: npm ci
+            workingDirectory: apps/web
+            displayName: 'Install web dependencies (needed by webServer)'
           - script: npm ci && npx playwright install --with-deps
             workingDirectory: tests/e2e
             displayName: 'Install Playwright'
           - script: npm test
             workingDirectory: tests/e2e
             displayName: 'Run E2E tests'
+            env:
+              TF_BUILD: 'true'
           - task: PublishTestResults@2
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: 'tests/e2e/results/*.xml'
+              testResultsFiles: 'tests/e2e/results/junit.xml'
 
   - stage: Build
     displayName: 'Build Docker Images'
