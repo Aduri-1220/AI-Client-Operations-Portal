@@ -51,7 +51,8 @@ export default function ProjectsPage() {
 
   const onSubmit = (data: ProjectForm) => {
     const { budget, ...rest } = data;
-    const newProject: Project = { ...rest, budget: parseFloat(budget), id: Date.now().toString(), assignedTeam: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const newProject: Project = { ...rest, budget: parseFloat(budget), id: crypto.randomUUID(), assignedTeam: [], createdAt: now, updatedAt: now };
     setProjects(prev => [newProject, ...prev]);
     setModalOpen(false);
     reset();

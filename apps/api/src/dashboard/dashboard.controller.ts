@@ -31,6 +31,6 @@ export class DashboardController {
   @ApiOperation({ summary: 'Get task counts grouped by status' })
   async tasksByStatus() {
     const result = await this.tasks.createQueryBuilder('task').select('task.status', 'status').addSelect('COUNT(*)', 'count').groupBy('task.status').getRawMany();
-    return Object.fromEntries(result.map(r => [r.status, parseInt(r.count)]));
+    return Object.fromEntries(result.map((r: { status: string; count: string }) => [r.status, parseInt(r.count)]));
   }
 }

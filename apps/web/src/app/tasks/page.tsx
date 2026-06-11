@@ -30,7 +30,7 @@ const taskSchema = z.object({
   projectId: z.string().min(1, 'Project required'),
   status: z.enum(['BACKLOG', 'TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
-  storyPoints: z.coerce.number().optional(),
+  storyPoints: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -59,8 +59,8 @@ export default function TasksPage() {
   const onSubmit = (data: TaskForm) => {
     const newTask: Task = {
       ...data,
-      id: Date.now().toString(),
-      storyPoints: data.storyPoints as Task['storyPoints'],
+      id: crypto.randomUUID(),
+      storyPoints: data.storyPoints ? (parseInt(data.storyPoints) as Task['storyPoints']) : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
