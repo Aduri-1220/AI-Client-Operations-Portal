@@ -36,7 +36,7 @@ export default function DashboardPage() {
       <div className="flex-1 p-6 space-y-6 overflow-auto">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Welcome back, Admin</h2>
-          <p className="text-sm text-gray-500 mt-1">Here's what's happening across your portal today.</p>
+          <p className="text-sm text-gray-500 mt-1">Here&apos;s what&apos;s happening across your portal today.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

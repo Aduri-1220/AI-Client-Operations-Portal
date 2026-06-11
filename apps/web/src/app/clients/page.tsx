@@ -66,7 +66,8 @@ export default function ClientsPage() {
     if (editingClient) {
       setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...data, updatedAt: new Date().toISOString() } : c));
     } else {
-      const newClient: Client = { ...data, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      const now = new Date().toISOString();
+      const newClient: Client = { ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
       setClients(prev => [newClient, ...prev]);
     }
     setModalOpen(false);

@@ -20,7 +20,7 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = async (data: LoginForm) => {
+  const onSubmit = async (_data: LoginForm) => {
     await new Promise(r => setTimeout(r, 800));
     localStorage.setItem('token', 'mock-jwt-token');
     router.push('/dashboard');
