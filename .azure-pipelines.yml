@@ -83,10 +83,11 @@ stages:
             displayName: 'Login to ACR'
             inputs:
               command: login
-              containerRegistry: '$(ACR_SERVICE_CONNECTION)'
+              containerRegistry: 'ACRServiceConnection'
           - task: Docker@2
             displayName: 'Build & push API'
             inputs:
+              containerRegistry: 'ACRServiceConnection'
               command: buildAndPush
               repository: 'api'
               dockerfile: 'apps/api/Dockerfile'
@@ -96,6 +97,7 @@ stages:
           - task: Docker@2
             displayName: 'Build & push Web'
             inputs:
+              containerRegistry: 'ACRServiceConnection'
               command: buildAndPush
               repository: 'web'
               dockerfile: 'apps/web/Dockerfile'
@@ -105,6 +107,7 @@ stages:
           - task: Docker@2
             displayName: 'Build & push .NET Reports'
             inputs:
+              containerRegistry: 'ACRServiceConnection'
               command: buildAndPush
               repository: 'reports'
               dockerfile: 'apps/dotnet-service/ReportsService/Dockerfile'
@@ -126,7 +129,7 @@ stages:
                 - task: AzureCLI@2
                   displayName: 'Deploy Bicep infra'
                   inputs:
-                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    azureSubscription: 'AzureServiceConnection'
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
@@ -137,7 +140,7 @@ stages:
                 - task: AzureCLI@2
                   displayName: 'Update ACI containers'
                   inputs:
-                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    azureSubscription: 'AzureServiceConnection'
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
