@@ -84,41 +84,32 @@ stages:
     jobs:
       - job: BuildImages
         steps:
-          - task: Docker@2
-            displayName: 'Login to ACR'
+          - task: AzureCLI@2
+            displayName: 'Build & push all images'
             inputs:
-              command: login
-              containerRegistry: 'ACRServiceConnection'
-          - task: Docker@2
-            displayName: 'Build & push API'
-            inputs:
-              containerRegistry: 'ACRServiceConnection'
-              command: buildAndPush
-              repository: 'api'
-              dockerfile: 'apps/api/Dockerfile'
-              tags: |
-                $(Build.BuildId)
-                latest
-          - task: Docker@2
-            displayName: 'Build & push Web'
-            inputs:
-              containerRegistry: 'ACRServiceConnection'
-              command: buildAndPush
-              repository: 'web'
-              dockerfile: 'apps/web/Dockerfile'
-              tags: |
-                $(Build.BuildId)
-                latest
-          - task: Docker@2
-            displayName: 'Build & push .NET Reports'
-            inputs:
-              containerRegistry: 'ACRServiceConnection'
-              command: buildAndPush
-              repository: 'reports'
-              dockerfile: 'apps/dotnet-service/ReportsService/Dockerfile'
-              tags: |
-                $(Build.BuildId)
-                latest
+              azureSubscription: 'AzureServiceConnection'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -ex
+                ACR="$(ACR_NAME).azurecr.io"
+                az acr login --name $(ACR_NAME)
+
+                docker build -t "$ACR/api:$(Build.BuildId)" -t "$ACR/api:latest" -f apps/api/Dockerfile apps/api
+                docker push "$ACR/api:$(Build.BuildId)"
+                docker push "$ACR/api:latest"
+
+                docker build -t "$ACR/web:$(Build.BuildId)" -t "$ACR/web:latest" -f apps/web/Dockerfile apps/web
+                docker push "$ACR/web:$(Build.BuildId)"
+                docker push "$ACR/web:latest"
+
+                docker build -t "$ACR/reports:$(Build.BuildId)" -t "$ACR/reports:latest" -f apps/dotnet-service/ReportsService/Dockerfile apps/dotnet-service/ReportsService
+                docker push "$ACR/reports:$(Build.BuildId)"
+                docker push "$ACR/reports:latest"
+
+                echo "=== Images in ACR ==="
+                az acr repository list --name $(ACR_NAME) -o table
+                az acr repository show-tags --name $(ACR_NAME) --repository api -o table
 
   - stage: Deploy
     displayName: 'Deploy to Azure'
