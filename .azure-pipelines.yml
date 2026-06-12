@@ -144,11 +144,34 @@ stages:
                         --template-file infra/bicep/main.bicep \
                         --parameters environment=dev
                 - task: AzureCLI@2
-                  displayName: 'Update ACI containers'
+                  displayName: 'Deploy ACI containers'
                   inputs:
                     azureSubscription: 'AzureServiceConnection'
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
-                      az container restart --name $(ACI_API) --resource-group $(RESOURCE_GROUP)
-                      az container restart --name $(ACI_WEB) --resource-group $(RESOURCE_GROUP)
+                      ACR_SERVER="$(ACR_NAME).azurecr.io"
+                      ACR_USER=$(az acr credential show --name $(ACR_NAME) --query username -o tsv)
+                      ACR_PASS=$(az acr credential show --name $(ACR_NAME) --query passwords[0].value -o tsv)
+
+                      az container create \
+                        --name $(ACI_API) \
+                        --resource-group $(RESOURCE_GROUP) \
+                        --image "$ACR_SERVER/api:$(Build.BuildId)" \
+                        --registry-login-server "$ACR_SERVER" \
+                        --registry-username "$ACR_USER" \
+                        --registry-password "$ACR_PASS" \
+                        --ports 3001 \
+                        --environment-variables NODE_ENV=production PORT=3001 \
+                        --cpu 1 --memory 2
+
+                      az container create \
+                        --name $(ACI_WEB) \
+                        --resource-group $(RESOURCE_GROUP) \
+                        --image "$ACR_SERVER/web:$(Build.BuildId)" \
+                        --registry-login-server "$ACR_SERVER" \
+                        --registry-username "$ACR_USER" \
+                        --registry-password "$ACR_PASS" \
+                        --ports 3000 \
+                        --environment-variables NODE_ENV=production \
+                        --cpu 1 --memory 2

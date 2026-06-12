@@ -33,34 +33,4 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   kind: 'StorageV2'
 }
 
-resource apiContainer 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
-  name: 'aiops-api-${environment}'
-  location: location
-  properties: {
-    containers: [{
-      name: 'api'
-      properties: {
-        image: '${acr.properties.loginServer}/api:latest'
-        ports: [{ port: 3001, protocol: 'TCP' }]
-        resources: { requests: { cpu: 1, memoryInGB: 2 } }
-        environmentVariables: [
-          { name: 'NODE_ENV', value: 'production' }
-          { name: 'PORT', value: '3001' }
-        ]
-      }
-    }]
-    osType: 'Linux'
-    ipAddress: {
-      type: 'Public'
-      ports: [{ port: 3001, protocol: 'TCP' }]
-    }
-    imageRegistryCredentials: [{
-      server: acr.properties.loginServer
-      username: acr.listCredentials().username
-      password: acr.listCredentials().passwords[0].value
-    }]
-  }
-}
-
 output acrLoginServer string = acr.properties.loginServer
-output apiContainerIp string = apiContainer.properties.ipAddress.ip
