@@ -45,6 +45,7 @@ services:
       FRONTEND_URL: http://localhost:3000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       JWT_SECRET: ${JWT_SECRET:-supersecret-change-in-prod}
+      N8N_WEBHOOK_BASE_URL: http://n8n:5678/webhook
     ports:
       - '3001:3001'
     depends_on:
@@ -85,8 +86,17 @@ services:
       N8N_PROTOCOL: http
       WEBHOOK_URL: http://localhost:5678
       GENERIC_TIMEZONE: UTC
+      # host.docker.internal reaches the API running on the host machine (npm run start:dev on :3002)
+      API_BASE_URL: http://host.docker.internal:3002
+      API_TOKEN: dev-local-token
+      # webhook.site's edge TLS is incompatible with this container's OpenSSL (EPROTO); httpbin.org/post echoes the payload back and works cleanly for demo purposes
+      SLACK_WEBHOOK_URL: https://httpbin.org/post
+      # n8n 2.x blocks $env access inside node expressions by default; this workflow relies on it
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     ports:
       - '5678:5678'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     volumes:
       - n8n_data:/home/node/.n8n
       - ./automation/n8n-workflows:/home/node/.n8n/workflows

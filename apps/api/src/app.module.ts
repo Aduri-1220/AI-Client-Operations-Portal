@@ -8,6 +8,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AiModule } from './ai/ai.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { WorkflowsModule } from './workflows/workflows.module';
 import { Client } from './clients/client.entity';
 import { Project } from './projects/project.entity';
 import { Task } from './tasks/task.entity';
@@ -25,6 +26,7 @@ import { Task } from './tasks/task.entity';
       entities: [Client, Project, Task],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
+    WorkflowsModule,
     ClientsModule,
     ProjectsModule,
     TasksModule,

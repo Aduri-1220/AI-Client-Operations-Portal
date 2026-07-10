@@ -1,4 +1,5 @@
 {
+  "id": "a23879c7-4e1d-4187-b9c4-8b3e6ef1c24c",
   "name": "Client Onboarding Workflow",
   "nodes": [
     {
@@ -7,6 +8,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [200, 300],
+      "webhookId": "33333cef-30bf-40e5-9f9a-440cb0a4cc39",
       "parameters": {
         "path": "client-created",
         "httpMethod": "POST",
@@ -15,15 +17,11 @@
     },
     {
       "id": "2",
-      "name": "Send Welcome Email",
-      "type": "n8n-nodes-base.emailSend",
+      "name": "Send Welcome Email (stub — needs real SMTP/SendGrid before demo)",
+      "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [450, 300],
-      "parameters": {
-        "toEmail": "={{ $json.email }}",
-        "subject": "Welcome to our Portal — {{ $json.name }}",
-        "text": "Dear {{ $json.contactPerson }},\n\nWelcome to the AI Client Operations Portal. Your account has been created successfully.\n\nYour dedicated project team will be in touch shortly.\n\nBest regards,\nThe Operations Team"
-      }
+      "parameters": {}
     },
     {
       "id": "3",
@@ -35,15 +33,22 @@
         "method": "POST",
         "url": "={{ $env.API_BASE_URL }}/projects",
         "sendHeaders": true,
-        "headers": { "Authorization": "Bearer {{ $env.API_TOKEN }}" },
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.API_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
         "sendBody": true,
         "bodyParameters": {
-          "name": "=Onboarding — {{ $json.name }}",
-          "clientId": "={{ $json.id }}",
-          "status": "PLANNING",
-          "budget": 0,
-          "startDate": "={{ new Date().toISOString().split('T')[0] }}",
-          "deadline": "={{ new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] }}"
+          "parameters": [
+            { "name": "name", "value": "=Onboarding — {{ $json.body.name }}" },
+            { "name": "clientId", "value": "={{ $json.body.id }}" },
+            { "name": "status", "value": "PLANNING" },
+            { "name": "budget", "value": 0 },
+            { "name": "startDate", "value": "={{ new Date().toISOString().split('T')[0] }}" },
+            { "name": "deadline", "value": "={{ new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] }}" }
+          ]
         }
       }
     },
@@ -58,14 +63,16 @@
         "url": "={{ $env.SLACK_WEBHOOK_URL }}",
         "sendBody": true,
         "bodyParameters": {
-          "text": ":tada: New client onboarded: *{{ $json.name }}* ({{ $json.company }}). Project created. Please review and assign team."
+          "parameters": [
+            { "name": "text", "value": "=:tada: New client onboarded: *{{ $node[\"Webhook — New Client Created\"].json.body.name }}*. Project created: {{ $json.name }}. Please review and assign team." }
+          ]
         }
       }
     }
   ],
   "connections": {
-    "Webhook — New Client Created": { "main": [[{ "node": "Send Welcome Email", "type": "main", "index": 0 }]] },
-    "Send Welcome Email": { "main": [[{ "node": "Create Default Project", "type": "main", "index": 0 }]] },
+    "Webhook — New Client Created": { "main": [[{ "node": "Send Welcome Email (stub — needs real SMTP/SendGrid before demo)", "type": "main", "index": 0 }]] },
+    "Send Welcome Email (stub — needs real SMTP/SendGrid before demo)": { "main": [[{ "node": "Create Default Project", "type": "main", "index": 0 }]] },
     "Create Default Project": { "main": [[{ "node": "Notify Internal Team", "type": "main", "index": 0 }]] }
   }
 }

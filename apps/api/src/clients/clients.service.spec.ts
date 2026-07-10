@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 import { Client } from './client.entity';
+import { WorkflowsService } from '../workflows/workflows.service';
 
 const mockRepo = {
   find: jest.fn(),
@@ -13,6 +14,8 @@ const mockRepo = {
   delete: jest.fn(),
 };
 
+const mockWorkflows = { emit: jest.fn() };
+
 describe('ClientsService', () => {
   let service: ClientsService;
 
@@ -21,6 +24,7 @@ describe('ClientsService', () => {
       providers: [
         ClientsService,
         { provide: getRepositoryToken(Client), useValue: mockRepo },
+        { provide: WorkflowsService, useValue: mockWorkflows },
       ],
     }).compile();
     service = module.get<ClientsService>(ClientsService);
