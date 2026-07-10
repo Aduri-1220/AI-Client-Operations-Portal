@@ -9,9 +9,11 @@ import { TasksModule } from './tasks/tasks.module';
 import { AiModule } from './ai/ai.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { ApprovalsModule } from './approvals/approvals.module';
 import { Client } from './clients/client.entity';
 import { Project } from './projects/project.entity';
 import { Task } from './tasks/task.entity';
+import { Approval } from './approvals/approval.entity';
 
 @Module({
   imports: [
@@ -23,13 +25,14 @@ import { Task } from './tasks/task.entity';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'aiopsportal',
-      entities: [Client, Project, Task],
+      entities: [Client, Project, Task, Approval],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
     WorkflowsModule,
     ClientsModule,
     ProjectsModule,
     TasksModule,
+    ApprovalsModule,
     AiModule,
     DashboardModule,
   ],

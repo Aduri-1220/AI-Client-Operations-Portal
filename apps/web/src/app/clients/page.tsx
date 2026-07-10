@@ -9,9 +9,10 @@ import { Select } from '@/components/ui/Select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search, Mail, Phone, Edit, Trash2 } from 'lucide-react';
 import type { Client } from '@/types';
+import { clientsService } from '@/services/clients';
 
 const clientSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -25,13 +26,6 @@ const clientSchema = z.object({
 
 type ClientForm = z.infer<typeof clientSchema>;
 
-const mockClients: Client[] = [
-  { id: '1', name: 'Acme Corporation', contactPerson: 'John Smith', email: 'john@acme.com', phone: '+1-555-0101', company: 'Acme Corp', status: 'ACTIVE', createdAt: '2026-01-15', updatedAt: '2026-06-01' },
-  { id: '2', name: 'TechStart Inc', contactPerson: 'Sarah Johnson', email: 'sarah@techstart.io', phone: '+1-555-0202', company: 'TechStart', status: 'ACTIVE', createdAt: '2026-02-20', updatedAt: '2026-05-15' },
-  { id: '3', name: 'Bright Solutions', contactPerson: 'Mike Davis', email: 'mike@bright.co', phone: '+1-555-0303', company: 'Bright Solutions', status: 'PROSPECT', createdAt: '2026-03-10', updatedAt: '2026-06-05' },
-  { id: '4', name: 'DataFlow Ltd', contactPerson: 'Emma Wilson', email: 'emma@dataflow.net', phone: '+1-555-0404', company: 'DataFlow Ltd', status: 'INACTIVE', createdAt: '2025-11-01', updatedAt: '2026-03-20' },
-];
-
 const statusBadge: Record<string, { label: string; variant: 'success' | 'default' | 'warning' }> = {
   ACTIVE: { label: 'Active', variant: 'success' },
   INACTIVE: { label: 'Inactive', variant: 'default' },
@@ -39,7 +33,9 @@ const statusBadge: Record<string, { label: string; variant: 'success' | 'default
 };
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -48,6 +44,13 @@ export default function ClientsPage() {
     resolver: zodResolver(clientSchema),
     defaultValues: { status: 'ACTIVE' },
   });
+
+  useEffect(() => {
+    clientsService.getAll()
+      .then(setClients)
+      .catch(() => setError('Could not load clients — is the API running?'))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -62,19 +65,22 @@ export default function ClientsPage() {
     setModalOpen(true);
   };
 
-  const onSubmit = (data: ClientForm) => {
+  const onSubmit = async (data: ClientForm) => {
     if (editingClient) {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...data, updatedAt: new Date().toISOString() } : c));
+      const updated = await clientsService.update(editingClient.id, data);
+      setClients(prev => prev.map(c => c.id === editingClient.id ? updated : c));
     } else {
-      const now = new Date().toISOString();
-      const newClient: Client = { ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
-      setClients(prev => [newClient, ...prev]);
+      const created = await clientsService.create(data);
+      setClients(prev => [created, ...prev]);
     }
     setModalOpen(false);
     reset();
   };
 
-  const deleteClient = (id: string) => setClients(prev => prev.filter(c => c.id !== id));
+  const deleteClient = async (id: string) => {
+    await clientsService.delete(id);
+    setClients(prev => prev.filter(c => c.id !== id));
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -94,6 +100,9 @@ export default function ClientsPage() {
             <Plus className="h-4 w-4" /> Add Client
           </Button>
         </div>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {loading && <p className="text-sm text-gray-500">Loading clients…</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(client => {

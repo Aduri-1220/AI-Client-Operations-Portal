@@ -9,10 +9,12 @@ import { Select } from '@/components/ui/Select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Calendar, DollarSign, Users } from 'lucide-react';
-import type { Project } from '@/types';
+import type { Client, Project } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { projectsService } from '@/services/projects';
+import { clientsService } from '@/services/clients';
 
 const projectSchema = z.object({
   name: z.string().min(2, 'Name required'),
@@ -26,12 +28,6 @@ const projectSchema = z.object({
 
 type ProjectForm = z.infer<typeof projectSchema>;
 
-const mockProjects: Project[] = [
-  { id: '1', name: 'E-Commerce Platform', clientId: '1', startDate: '2026-01-15', deadline: '2026-07-15', budget: 120000, status: 'IN_PROGRESS', assignedTeam: ['user1', 'user2'], createdAt: '2026-01-15', updatedAt: '2026-06-01' },
-  { id: '2', name: 'CRM Integration', clientId: '2', startDate: '2026-03-01', deadline: '2026-06-20', budget: 45000, status: 'UAT', assignedTeam: ['user3'], createdAt: '2026-03-01', updatedAt: '2026-06-05' },
-  { id: '3', name: 'Mobile App v2', clientId: '3', startDate: '2026-05-01', deadline: '2026-08-01', budget: 80000, status: 'PLANNING', assignedTeam: ['user1', 'user4'], createdAt: '2026-05-01', updatedAt: '2026-06-01' },
-];
-
 const statusConfig: Record<string, { label: string; variant: 'info' | 'warning' | 'success' | 'default' | 'purple' }> = {
   PLANNING: { label: 'Planning', variant: 'default' },
   IN_PROGRESS: { label: 'In Progress', variant: 'info' },
@@ -41,7 +37,10 @@ const statusConfig: Record<string, { label: string; variant: 'info' | 'warning' 
 };
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProjectForm>({
@@ -49,11 +48,23 @@ export default function ProjectsPage() {
     defaultValues: { status: 'PLANNING' },
   });
 
-  const onSubmit = (data: ProjectForm) => {
+  useEffect(() => {
+    Promise.all([projectsService.getAll(), clientsService.getAll()])
+      .then(([projectsData, clientsData]) => {
+        setProjects(projectsData);
+        setClients(clientsData);
+      })
+      .catch(() => setError('Could not load projects — is the API running?'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const clientName = (project: Project) =>
+    project.client?.name ?? clients.find(c => c.id === project.clientId)?.name ?? 'Unknown client';
+
+  const onSubmit = async (data: ProjectForm) => {
     const { budget, ...rest } = data;
-    const now = new Date().toISOString();
-    const newProject: Project = { ...rest, budget: parseFloat(budget), id: crypto.randomUUID(), assignedTeam: [], createdAt: now, updatedAt: now };
-    setProjects(prev => [newProject, ...prev]);
+    const created = await projectsService.create({ ...rest, budget: parseFloat(budget), assignedTeam: [] });
+    setProjects(prev => [created, ...prev]);
     setModalOpen(false);
     reset();
   };
@@ -68,13 +79,22 @@ export default function ProjectsPage() {
           </Button>
         </div>
 
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {loading && <p className="text-sm text-gray-500">Loading projects…</p>}
+        {!loading && !error && clients.length === 0 && (
+          <p className="text-sm text-gray-500">No clients yet — add a client first so you can assign a project to them.</p>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {projects.map(project => {
             const cfg = statusConfig[project.status];
             return (
               <Card key={project.id} className="p-5 hover:shadow-md transition-shadow cursor-pointer">
                 <div className="flex items-start justify-between mb-4">
-                  <h3 className="font-semibold text-gray-900">{project.name}</h3>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{project.name}</h3>
+                    <p className="text-sm text-gray-500">{clientName(project)}</p>
+                  </div>
                   <Badge variant={cfg.variant}>{cfg.label}</Badge>
                 </div>
                 <div className="space-y-2 text-sm text-gray-600">
@@ -84,7 +104,7 @@ export default function ProjectsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-gray-400" />
-                    <span>{formatCurrency(project.budget)}</span>
+                    <span>{formatCurrency(Number(project.budget))}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-gray-400" />
@@ -110,11 +130,10 @@ export default function ProjectsPage() {
             id="clientId"
             {...register('clientId')}
             options={[
-              { value: '', label: 'Select client...' },
-              { value: '1', label: 'Acme Corporation' },
-              { value: '2', label: 'TechStart Inc' },
-              { value: '3', label: 'Bright Solutions' },
+              { value: '', label: clients.length ? 'Select client...' : 'No clients yet — add one first' },
+              ...clients.map(c => ({ value: c.id, label: c.name })),
             ]}
+            error={errors.clientId?.message}
           />
           <div className="grid grid-cols-2 gap-4">
             <Input label="Start Date" id="startDate" type="date" {...register('startDate')} error={errors.startDate?.message} />

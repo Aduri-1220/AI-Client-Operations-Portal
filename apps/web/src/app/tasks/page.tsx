@@ -8,10 +8,12 @@ import { Select } from '@/components/ui/Select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import type { Task } from '@/types';
+import type { Project, Task } from '@/types';
 import { cn } from '@/lib/utils';
+import { tasksService } from '@/services/tasks';
+import { projectsService } from '@/services/projects';
 
 const COLUMNS: { status: Task['status']; label: string }[] = [
   { status: 'BACKLOG', label: 'Backlog' },
@@ -36,18 +38,11 @@ const taskSchema = z.object({
 
 type TaskForm = z.infer<typeof taskSchema>;
 
-const mockTasks: Task[] = [
-  { id: '1', title: 'Set up authentication flow', projectId: '1', status: 'DONE', priority: 'HIGH', storyPoints: 5, createdAt: '2026-06-01', updatedAt: '2026-06-05' },
-  { id: '2', title: 'Design client dashboard UI', projectId: '1', status: 'IN_PROGRESS', priority: 'HIGH', storyPoints: 8, createdAt: '2026-06-02', updatedAt: '2026-06-06' },
-  { id: '3', title: 'Build REST API for projects', projectId: '1', status: 'IN_PROGRESS', priority: 'MEDIUM', storyPoints: 5, createdAt: '2026-06-03', updatedAt: '2026-06-07' },
-  { id: '4', title: 'Write Playwright E2E tests', projectId: '2', status: 'TODO', priority: 'MEDIUM', storyPoints: 3, createdAt: '2026-06-04', updatedAt: '2026-06-04' },
-  { id: '5', title: 'Configure Azure AD B2C', projectId: '1', status: 'REVIEW', priority: 'CRITICAL', storyPoints: 8, createdAt: '2026-06-05', updatedAt: '2026-06-08' },
-  { id: '6', title: 'Set up n8n workflows', projectId: '2', status: 'BACKLOG', priority: 'LOW', storyPoints: 3, createdAt: '2026-06-06', updatedAt: '2026-06-06' },
-  { id: '7', title: 'Implement MCP server tools', projectId: '1', status: 'TODO', priority: 'HIGH', storyPoints: 13, createdAt: '2026-06-07', updatedAt: '2026-06-07' },
-];
-
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
 
@@ -56,21 +51,32 @@ export default function TasksPage() {
     defaultValues: { status: 'BACKLOG', priority: 'MEDIUM' },
   });
 
-  const onSubmit = (data: TaskForm) => {
-    const newTask: Task = {
+  useEffect(() => {
+    Promise.all([tasksService.getAll(), projectsService.getAll()])
+      .then(([tasksData, projectsData]) => {
+        setTasks(tasksData);
+        setProjects(projectsData);
+      })
+      .catch(() => setError('Could not load tasks — is the API running?'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const projectName = (task: Task) =>
+    task.project?.name ?? projects.find(p => p.id === task.projectId)?.name ?? 'Unknown project';
+
+  const onSubmit = async (data: TaskForm) => {
+    const created = await tasksService.create({
       ...data,
-      id: crypto.randomUUID(),
       storyPoints: data.storyPoints ? (parseInt(data.storyPoints) as Task['storyPoints']) : undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setTasks(prev => [newTask, ...prev]);
+    });
+    setTasks(prev => [created, ...prev]);
     setModalOpen(false);
     reset();
   };
 
-  const moveTask = (taskId: string, newStatus: Task['status']) => {
+  const moveTask = async (taskId: string, newStatus: Task['status']) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t));
+    await tasksService.updateStatus(taskId, newStatus);
   };
 
   return (
@@ -82,6 +88,12 @@ export default function TasksPage() {
             <Plus className="h-4 w-4" /> New Task
           </Button>
         </div>
+
+        {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+        {loading && <p className="text-sm text-gray-500 mb-4">Loading tasks…</p>}
+        {!loading && !error && projects.length === 0 && (
+          <p className="text-sm text-gray-500 mb-4">No projects yet — add a project first so you can assign a task to it.</p>
+        )}
 
         <div className="flex gap-4 min-w-max pb-4">
           {COLUMNS.map(col => {
@@ -109,7 +121,8 @@ export default function TasksPage() {
                         dragging === task.id && 'opacity-50'
                       )}
                     >
-                      <p className="text-sm font-medium text-gray-900 mb-2">{task.title}</p>
+                      <p className="text-sm font-medium text-gray-900 mb-1">{task.title}</p>
+                      <p className="text-xs text-gray-500 mb-2 truncate">{projectName(task)}</p>
                       <div className="flex items-center justify-between">
                         <Badge variant={priorityVariant[task.priority]} className="text-xs">
                           {task.priority}
@@ -137,11 +150,10 @@ export default function TasksPage() {
             id="projectId"
             {...register('projectId')}
             options={[
-              { value: '', label: 'Select project...' },
-              { value: '1', label: 'E-Commerce Platform' },
-              { value: '2', label: 'CRM Integration' },
-              { value: '3', label: 'Mobile App v2' },
+              { value: '', label: projects.length ? 'Select project...' : 'No projects yet — add one first' },
+              ...projects.map(p => ({ value: p.id, label: p.name })),
             ]}
+            error={errors.projectId?.message}
           />
           <div className="grid grid-cols-2 gap-4">
             <Select

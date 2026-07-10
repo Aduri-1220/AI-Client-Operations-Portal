@@ -3,17 +3,11 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import type { Approval } from '@/types';
 import { formatDate } from '@/lib/utils';
-
-const mockApprovals: Approval[] = [
-  { id: '1', title: 'UAT Sign-off Document — CRM Integration', documentId: 'd1', requestedBy: 'Sarah Johnson', status: 'PENDING', createdAt: '2026-06-07', updatedAt: '2026-06-07' },
-  { id: '2', title: 'Project Proposal — Mobile App v2', documentId: 'd2', requestedBy: 'Mike Davis', status: 'APPROVED', notes: 'Approved with minor revisions noted.', createdAt: '2026-06-01', updatedAt: '2026-06-03' },
-  { id: '3', title: 'Invoice Draft — Acme Corp Q2', documentId: 'd3', requestedBy: 'Admin', status: 'REJECTED', notes: 'Line items need revision.', createdAt: '2026-05-28', updatedAt: '2026-06-02' },
-  { id: '4', title: 'Architecture Decision Record — Auth', documentId: 'd4', requestedBy: 'Emma Wilson', status: 'PENDING', createdAt: '2026-06-08', updatedAt: '2026-06-08' },
-];
+import { approvalsService } from '@/services/approvals';
 
 const statusConfig: Record<string, { label: string; variant: 'warning' | 'success' | 'danger'; icon: typeof Clock }> = {
   PENDING: { label: 'Pending', variant: 'warning', icon: Clock },
@@ -22,10 +16,20 @@ const statusConfig: Record<string, { label: string; variant: 'warning' | 'succes
 };
 
 export default function ApprovalsPage() {
-  const [approvals, setApprovals] = useState<Approval[]>(mockApprovals);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const updateStatus = (id: string, status: Approval['status']) => {
-    setApprovals(prev => prev.map(a => a.id === id ? { ...a, status, updatedAt: new Date().toISOString() } : a));
+  useEffect(() => {
+    approvalsService.getAll()
+      .then(setApprovals)
+      .catch(() => setError('Could not load approvals — is the API running?'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const updateStatus = async (id: string, status: Approval['status']) => {
+    const updated = await approvalsService.updateStatus(id, status);
+    setApprovals(prev => prev.map(a => a.id === id ? updated : a));
   };
 
   const pending = approvals.filter(a => a.status === 'PENDING');
@@ -35,6 +39,9 @@ export default function ApprovalsPage() {
     <div className="flex flex-col h-full">
       <Header title="Approvals" />
       <div className="flex-1 p-6 space-y-6 overflow-auto">
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {loading && <p className="text-sm text-gray-500">Loading approvals…</p>}
+
         <div className="grid grid-cols-3 gap-4">
           {['PENDING', 'APPROVED', 'REJECTED'].map(s => {
             const cfg = statusConfig[s];
